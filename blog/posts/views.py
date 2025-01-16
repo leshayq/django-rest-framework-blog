@@ -7,8 +7,11 @@ from rest_framework.mixins import ListModelMixin, RetrieveModelMixin
 from rest_framework.generics import RetrieveUpdateDestroyAPIView, ListAPIView, RetrieveAPIView, CreateAPIView
 from .models import Post
 from .serializers import PostSerializer
+from authentication.serializers import RegisterSerializer
 from django.http import Http404
 from rest_framework import status
+from .permissions import IsOwner
+from django.contrib.auth.models import User
 
 class CreateListPostAPIView(APIView):
 
@@ -25,7 +28,7 @@ class CreateListPostAPIView(APIView):
     def post(self, request, *args, **kwargs):
         serializer = PostSerializer(data=request.data)
         if serializer.is_valid():
-            serializer.save(user_id=request.user)
+            serializer.save(creator=request.user)
             return Response(serializer.data, status=201)
         return Response(serializer.errors, status=400)
 
@@ -33,7 +36,7 @@ class PostDetailAPIView(APIView):
         
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
-            return [IsAuthenticated()]
+            return [IsOwner()]
         return [AllowAny()]
     
     def get_object(self, pk):
@@ -49,6 +52,24 @@ class PostDetailAPIView(APIView):
     
     def delete(self, request, pk, format=None):
         post = self.get_object(pk)
+        self.check_object_permissions(request, post)  
         post.delete()
         return Response(status=status.HTTP_204_NO_CONTENT)
+    
+    def put(self, request, pk, format=None):
+        post = self.get_object(pk)
+        self.check_object_permissions(request, post) 
+        serializer = PostSerializer(post, data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
+    def patch(self, request, pk, format=None):
+        post = self.get_object(pk)
+        self.check_object_permissions(request, post) 
+        serializer = PostSerializer(post, data=request.data, partial=True)
+        if serializer.is_valid():
+            serializer.save() 
+            return Response(serializer.data)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
