@@ -15,9 +15,3 @@ class IsAuthorOfComment(permissions.BasePermission):
         
         return obj.user == request.user
     
-class OwnerOfInstance:
-    def has_object_permission(request, view, obj, field):
-        if request.method in permissions.SAFE_METHODS:
-            return True
-        
-        return obj.field == request.user

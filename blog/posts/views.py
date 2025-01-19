@@ -12,137 +12,50 @@ from django.http import Http404
 from rest_framework import status
 from .permissions import IsOwner, IsAuthorOfComment
 from django.contrib.auth.models import User
+from rest_framework.viewsets import ModelViewSet
 
+#Post related Viewset implementing basic CRUD
+class PostViewSet(ModelViewSet):
+    queryset = Post.objects.all()
+    serializer_class = PostSerializer
 
-
-#Post object related API Views
-
-#creating new post and getting list of all posts
-class CreateListPostAPIView(APIView):
-
-    def get_permissions(self):
-        if self.request.method == 'POST':
-            return [IsAuthenticated()]
-        return [AllowAny()]
-    
-    def get(self, request, format=None):
-        queryset = Post.objects.all()
-        serializer = PostSerializer(queryset, many=True)
-        return Response(serializer.data)
-
-    def post(self, request, *args, **kwargs):
-        serializer = PostSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(creator=request.user)
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
-
-#retrieving, updating, deleting single post
-class PostDetailAPIView(APIView):
-    
-    #user can edit post only if he is owner of this post
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
             return [IsOwner()]
-        return [AllowAny()]
-    
-    def get_object(self, pk):
-        try:
-            return Post.objects.get(pk=pk)
-        except Post.DoesNotExist:
-            raise Http404
-        
-    def get(self, request, pk, format=None):
-        post = self.get_object(pk)
-        serializer = PostSerializer(post)
-        return Response(serializer.data)
-    
-    def delete(self, request, pk, format=None):
-        post = self.get_object(pk)
-        self.check_object_permissions(request, post)  
-        post.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
-    def put(self, request, pk, format=None):
-        post = self.get_object(pk)
-        self.check_object_permissions(request, post) 
-        serializer = PostSerializer(post, data=request.data)
-        if serializer.is_valid():
-            serializer.save()
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-    def patch(self, request, pk, format=None):
-        post = self.get_object(pk)
-        self.check_object_permissions(request, post) 
-        serializer = PostSerializer(post, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save() 
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-
-
-#Comment object related API Views
-
-#commenting and getting list of all comments
-class CreateListCommentAPIView(APIView):
-    def get_permissions(self):
-        if self.request.method == 'POST':
+        elif self.request.method == 'POST':
             return [IsAuthenticated()]
         return [AllowAny()]
     
-    def get(self, request, format=None):
-        queryset = Comment.objects.all()
-        serializer = CommentSerializer(queryset, many=True)
-        return Response(serializer.data)
-    
-    def post(self, request, *args, **kwargs):
-        serializer = CommentSerializer(data=request.data)
-        if serializer.is_valid():
-            serializer.save(user=request.user)
-            return Response(serializer.data, status=201)
-        return Response(serializer.errors, status=400)
-    
+    #POST
+    def perform_create(self, serializer):
+        serializer.save(creator=self.request.user)
 
-
-class CommentDetailAPIView(APIView):
+#Comment related Viewset implementing basic CRUD
+class CommentViewSet(ModelViewSet):
+    queryset = Comment.objects.all()
+    serializer_class = CommentSerializer
 
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
             return [IsAuthorOfComment()]
+        elif self.request.method == 'POST':
+            return [IsAuthenticated()]
         return [AllowAny()]
     
-    def get_object(self, pk):
-        try:
-            return Comment.objects.get(pk=pk)
-        except Comment.DoesNotExist:
-            raise Http404
-    
-    def get(self, request, pk, format=None):
-        comment = self.get_object(pk)
-        serializer = CommentSerializer(comment)
-        return Response(serializer.data)
-    
-    def delete(self, request, pk, format=None):
-        comment = self.get_object(pk)
-        self.check_object_permissions(request, comment)  
-        comment.delete()
-        return Response(status=status.HTTP_204_NO_CONTENT)
-    
-    def put(self, request, pk, format=None):
-        comment = self.get_object(pk)
-        self.check_object_permissions(request, comment) 
-        serializer = CommentSerializer(comment, data=request.data)
-        if serializer.is_valid():
-            serializer.save(modified=True)
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #POST
+    def perform_create(self, serializer):
+        serializer.save(user=self.request.user)
 
-    def patch(self, request, pk, format=None):
-        comment = self.get_object(pk)
-        self.check_object_permissions(request, comment) 
-        serializer = CommentSerializer(comment, data=request.data, partial=True)
-        if serializer.is_valid():
-            serializer.save(modified=True) 
-            return Response(serializer.data)
-        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+    #PUT
+    def perform_update(self, serializer):
+        serializer.save(modified=True)
+
+    #PATCH
+    def partial_update(self, request, *args, **kwargs):
+        partial = kwargs.pop('partial', True)
+        instance = self.get_object()
+        self.check_object_permissions(request, instance) 
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        self.perform_update(serializer)
+        return Response(serializer.data)
