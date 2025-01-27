@@ -13,11 +13,13 @@ from rest_framework import status
 from .permissions import IsOwner, IsAuthorOfComment
 from django.contrib.auth.models import User
 from rest_framework.viewsets import ModelViewSet
+from .pagination import StandardResultsSetPagination
 
 #Post related Viewset implementing basic CRUD
 class PostViewSet(ModelViewSet):
     queryset = Post.objects.all()
     serializer_class = PostSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
@@ -34,6 +36,7 @@ class PostViewSet(ModelViewSet):
 class CommentViewSet(ModelViewSet):
     queryset = Comment.objects.all()
     serializer_class = CommentSerializer
+    pagination_class = StandardResultsSetPagination
 
     def get_permissions(self):
         if self.request.method in ('PUT', 'PATCH', 'DELETE'):
